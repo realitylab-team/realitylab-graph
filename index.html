@@ -24,131 +24,287 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useCallback } = React;
+        const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-        // Icon Helper Component
+        // --- SAFE ICON COMPONENT (FIXED for latest Lucide versions) ---
+        const toPascalCase = (str) => str.replace(/(^\w|-\w)/g, (c) => c.replace('-', '').toUpperCase());
+
         const Icon = ({ name, size = 20, className = "" }) => {
-            const [iconSvg, setIconSvg] = useState("");
+            const [svgHtml, setSvgHtml] = useState(null);
+
             useEffect(() => {
-                if (window.lucide) {
-                    const svg = window.lucide.createIcons();
+                if (window.lucide && window.lucide.icons) {
+                    const pascalName = toPascalCase(name);
+                    const iconNode = window.lucide.icons[pascalName];
+                    
+                    if (iconNode) {
+                        try {
+                            // Fix: Use global createElement if available (newer versions)
+                            if (typeof window.lucide.createElement === 'function') {
+                                const element = window.lucide.createElement(iconNode);
+                                element.setAttribute('width', size);
+                                element.setAttribute('height', size);
+                                element.setAttribute('stroke-width', 2);
+                                if (className) element.setAttribute('class', className);
+                                setSvgHtml(element.outerHTML);
+                            } 
+                            // Fallback: Older versions where toSvg was on the node itself
+                            else if (typeof iconNode.toSvg === 'function') {
+                                const svg = iconNode.toSvg({
+                                    width: size,
+                                    height: size,
+                                    class: className,
+                                    "stroke-width": 2
+                                });
+                                setSvgHtml(svg);
+                            } else {
+                                console.warn(`Icon ${name} found but no generation method available.`);
+                            }
+                        } catch (err) {
+                            console.error("Error generating icon:", err);
+                        }
+                    } else {
+                        console.warn(`Icon not found: ${name}`);
+                    }
                 }
-            }, []);
-            return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
+            }, [name, size, className]);
+
+            if (!svgHtml) return <span style={{width: size, height: size, display: 'inline-block'}} />;
+
+            return <span dangerouslySetInnerHTML={{ __html: svgHtml }} style={{ display: 'inline-flex' }} />;
         };
 
-        // --- DATA & LOGIC (Identisch zu deiner funktionierenden Version) ---
-        const orgMetadata = {
-            "Arteria Technologies FlexCo": { url: "www.arteria.at", logo: "https://www.arteria-tech.com/assets/svg/logos/arteria_brand.svg" },
-            "baukult ZT GmbH": { url: "www.baukult.at", logo: "https://baukult.at/favicon.ico" },
-            "CEAS GmbH": { url: "www.ceas.at", logo: null },
-            "Die HausWirtschaft e.Gen.": { url: "www.diehauswirtschaft.at", logo: "https://diehauswirtschaft.at/wp-content/uploads/2022/04/dieHausWirtschaft-Lockup-cropped-hoch_Logo-dunkelblau.png" },
-            "e7 GmbH": { url: "www.e-sieben.at", logo: "https://www.e-sieben.at/includes/images/e7-logo.svg?m=1704730217" },
-            "ed-energiedigital GmbH": { url: "https://www.energiedigital.at/", logo: "https://www.energiedigital.at/img/logo/dark.png" },
-            "EGW Erste gemeinnützige Wohnungsgesellschaft mbH": { url: "www.egw.at", logo: "https://www.egw.at/favicon.ico" },
-            "einszueins architektur ZT GMBH": { url: "www.einszueins.at", logo: "https://www.einszueins.at/favicon.ico" },
-            "Ernst RAINER - Büro für resiliente Raum- und Stadtentwicklung e.U.": { url: "www.ernst-rainer.at", logo: "https://www.ernst-rainer.at/favicon.ico" },
-            "Fachhochschule Technikum Wien": { url: "www.technikum-wien.at", logo: "https://www.technikum-wien.at/favicon.ico" },
-            "Gartenheim Genossenschaft": { url: "www.gartenheim.at", logo: "https://www.gartenheim.at/favicon.ico" },
-            "GSG Altmannsdorf und Hetzendorf reg. Gen. m. b. H.": { url: "www.ah-wohnen.at", logo: "https://ah-wohnen.at/favicon.ico" },
-            "GrünStattGrau Forschungs- und Innovations-GmbH": { url: "www.gruenstattgrau.at", logo: "https://gruenstattgrau.at/wp-content/uploads/2024/02/cropped-cropped-gruenstattgrau_logo_square_rgb_300dpi-1.jpg" },
-            "grünplan gmbh": { url: "www.gruenplan.at", logo: "https://www.gruenplan.at/favicon.ico" },
-            "Initiative Gemeinsam Bauen und Wohnen": { url: "www.inigbw.org", logo: "https://www.inigbw.org/favicon.ico" },
-            "KELAG Energie & Wärme GmbH": { url: "www.kew.at", logo: "https://www.kew.at/favicon.ico" },
-            "Landeskrankenanstalten-Betriebsgesellschaft-KABEG": { url: "www.kabeg.at", logo: "https://www.kabeg.at/_assets/ce9a94c4a023abc6a288e39e1b7f94b3/Images/Logo.svg" },
-            "M2S Rechtsanwälte GmbH": { url: "www.m2s.at", logo: "https://www.m2s.at/favicon.ico" },
-            "nonconform zt gmbh": { url: "www.nonconform.at", logo: "https://www.nonconform.at/favicon.ico" },
-            "Pink GmbH": { url: "www.pink.co.at", logo: "https://www.pink.co.at/favicon.ico" },
-            "realitylab GmbH": { url: "www.realitylab.at", logo: "http://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2026/01/Brandmark_realitylab_rgb_black_m_mit_rand.png" },
-            "REENAG Holding GmbH": { url: "www.reenag.com", logo: "https://www.reenag.com/themes/reenag/reenag.png" },
-            "SOZIALBAU AG": { url: "www.sozialbau.at", logo: "https://www.sozialbau.at/fileadmin/favicon.png" },
-            "STC Development GmbH": { url: "www.stc-dev.com", logo: "https://www.stc-dev.com/favicon.ico" },
-            "Technische Universität Wien": { url: "www.tuwien.ac.at", logo: "https://www.tuwien.at/favicon.ico" },
-            "TPA Steuerberatung GmbH": { url: "www.tpa-group.at", logo: "https://www.tpa-group.at/app/uploads/2023/11/TPA_Logo_Druck_rgb.jpg" },
-            "Universität für Bodenkultur Wien": { url: "www.boku.ac.at", logo: "https://boku.ac.at/favicon.ico" },
-            "Verein zur Förderung der Klimaneutralität im Kahlenbergerdörfl": { url: "www.klimadoerfl.at", logo: null },
-            "VKFG Villacher Klimafit GmbH": { url: "www.villach.at", logo: "https://villach.at/favicon.ico" },
-            "Volkshilfe Wien": { url: "www.volkshilfe-wien.at", logo: "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://www.volkshilfe-wien.at" }
+        // --- ERROR BOUNDARY ---
+        class ErrorBoundary extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false, error: null };
+            }
+
+            static getDerivedStateFromError(error) {
+                return { hasError: true, error };
+            }
+
+            componentDidCatch(error, errorInfo) {
+                console.error("Uncaught error:", error, errorInfo);
+            }
+
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div className="p-8 bg-red-50 text-red-900 h-screen flex flex-col items-center justify-center text-center">
+                            <h1 className="text-2xl font-bold mb-4">Ups, da ist etwas schiefgelaufen.</h1>
+                            <p className="mb-4">Ein Fehler ist aufgetreten. Bitte laden Sie die Seite neu.</p>
+                            <pre className="text-xs bg-red-100 p-4 rounded text-left overflow-auto max-w-lg">
+                                {this.state.error && this.state.error.toString()}
+                            </pre>
+                            <button onClick={() => window.location.reload()} className="mt-6 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+                                Seite neu laden
+                            </button>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
+
+        // --- DATA INPUT ---
+        
+        // Blatt 1: Organisationen
+        const orgDataMap = {
+            "Arteria Technologies FlexCo": { url: "www.arteria.at", logo: "https://www.arteria-tech.com/assets/svg/logos/arteria_brand.svg", category: "National" },
+            "baukult ZT GmbH": { url: "www.baukult.at", logo: "https://baukult.at/favicon.ico", category: "National" },
+            "CEAS GmbH": { url: "www.ceas.at", logo: null, category: "National" },
+            "Die HausWirtschaft e.Gen.": { url: "www.diehauswirtschaft.at", logo: "https://diehauswirtschaft.at/wp-content/uploads/2022/04/dieHausWirtschaft-Lockup-cropped-hoch_Logo-dunkelblau.png", category: "National" },
+            "e7 GmbH": { url: "www.e-sieben.at", logo: "https://www.e-sieben.at/includes/images/e7-logo.svg?m=1704730217", category: "National" },
+            "ed-energiedigital GmbH": { url: "https://www.energiedigital.at/", logo: "https://www.energiedigital.at/img/logo/dark.png", category: "National" },
+            "EGW Erste gemeinnützige Wohnungsgesellschaft mbH": { url: "www.egw.at", logo: "https://www.egw.at/favicon.ico", category: "National" },
+            "einszueins architektur ZT GMBH": { url: "www.einszueins.at", logo: "https://www.einszueins.at/favicon.ico", category: "National" },
+            "Ernst RAINER - Büro für resiliente Raum- und Stadtentwicklung e.U.": { url: "www.ernst-rainer.at", logo: "https://www.ernst-rainer.at/favicon.ico", category: "National" },
+            "Fachhochschule Technikum Wien": { url: "www.technikum-wien.at", logo: "https://www.technikum-wien.at/favicon.ico", category: "National" },
+            "Gartenheim Genossenschaft": { url: "www.gartenheim.at", logo: "https://www.gartenheim.at/favicon.ico", category: "National" },
+            "GSG Altmannsdorf und Hetzendorf reg. Gen. m. b. H.": { url: "www.ah-wohnen.at", logo: "https://ah-wohnen.at/favicon.ico", category: "National" },
+            "GrünStattGrau Forschungs- und Innovations-GmbH": { url: "www.gruenstattgrau.at", logo: "https://gruenstattgrau.at/wp-content/uploads/2024/02/cropped-cropped-gruenstattgrau_logo_square_rgb_300dpi-1.jpg", category: "National" },
+            "grünplan gmbh": { url: "www.gruenplan.at", logo: "https://www.gruenplan.at/favicon.ico", category: "National" },
+            "Initiative Gemeinsam Bauen und Wohnen": { url: "www.inigbw.org", logo: "https://www.inigbw.org/favicon.ico", category: "National" },
+            "KELAG Energie & Wärme GmbH": { url: "www.kew.at", logo: "https://www.kew.at/favicon.ico", category: "National" },
+            "Kronawetter Philipp": { url: "www.kronawetter.at", logo: null, category: "National" },
+            "Landeskrankenanstalten-Betriebsgesellschaft-KABEG": { url: "www.kabeg.at", logo: "https://www.kabeg.at/_assets/ce9a94c4a023abc6a288e39e1b7f94b3/Images/Logo.svg", category: "National" },
+            "M2S Rechtsanwälte GmbH": { url: "www.m2s.at", logo: "https://www.m2s.at/favicon.ico", category: "National" },
+            "nonconform zt gmbh": { url: "www.nonconform.at", logo: "https://www.nonconform.at/favicon.ico", category: "National" },
+            "Pink GmbH": { url: "www.pink.co.at", logo: "https://www.pink.co.at/favicon.ico", category: "National" },
+            "realitylab GmbH": { url: "www.realitylab.at", logo: "http://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2026/01/Brandmark_realitylab_rgb_black_m_mit_rand.png", category: "Realitylab" },
+            "REENAG Holding GmbH": { url: "www.reenag.com", logo: "https://www.reenag.com/themes/reenag/reenag.png", category: "National" },
+            "SOZIALBAU AG": { url: "www.sozialbau.at", logo: "https://www.sozialbau.at/fileadmin/favicon.png", category: "National" },
+            "STC Development GmbH": { url: "www.stc-dev.com", logo: "https://www.stc-dev.com/favicon.ico", category: "National" },
+            "Technische Universität Wien": { url: "www.tuwien.ac.at", logo: "https://www.tuwien.at/favicon.ico", category: "National" },
+            "TPA Steuerberatung GmbH": { url: "www.tpa-group.at", logo: "https://www.tpa-group.at/app/uploads/2023/11/TPA_Logo_Druck_rgb.jpg", category: "National" },
+            "Universität für Bodenkultur Wien": { url: "www.boku.ac.at", logo: "https://boku.ac.at/favicon.ico", category: "National" },
+            "Verein zur Förderung der Klimaneutralität im Kahlenbergerdörfl": { url: "www.klimadoerfl.at", logo: null, category: "National" },
+            "VKFG Villacher Klimafit GmbH": { url: "www.villach.at", logo: "https://villach.at/favicon.ico", category: "National" },
+            "Volkshilfe Wien": { url: "www.volkshilfe-wien.at", logo: "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://www.volkshilfe-wien.at", category: "National" },
+            "Z plus B - gemeinschaftliches Wohnen in Graz": { url: "www.zplusb.at", logo: null, category: "National" },
+            "ÖBB-Infrastruktur Aktiengesellschaft (ÖBB-Infra)": { url: "www.oebb.at", logo: "https://infrastruktur.oebb.at/.resources/corp-2016/themes/images/favicons/favicon-32x32.png", category: "National" },
+            "HERRY Consult GmbH": { url: "www.herry.at", logo: "https://www.herry.at/images/favicon.ico", category: "National" },
+            "S&P Architekten ZT GmbH": { url: "www.soehnepartner.com", logo: "https://www.soehnepartner.com/favicon.ico", category: "National" },
+            "Stadt Villach": { url: "www.villach.at", logo: "https://villach.at/favicon.ico", category: "National" },
+            "Brau Union Österreich AG": { url: "www.brauunion.at", logo: "https://www.brauunion.at/favicon.ico", category: "National" },
+            "FH Kärnten": { url: "www.fh-kaernten.at", logo: "https://www.fh-kaernten.at/favicon.ico", category: "National" },
+            
+            // International Partners
+            "Bostadsrättsföreningen Röda Oasen": { url: "www.rodaoasen.se", logo: null, category: "International" },
+            "Drevet Koncept AB": { url: "www.drevet.se", logo: null, category: "International" },
+            "InnovAction Società Cooperativa": { url: "www.innovactioncoop.it", logo: null, category: "International" },
+            "Lunds universitet": { url: "www.lu.se", logo: null, category: "International" },
+            "Malmö stad": { url: "www.malmo.se", logo: null, category: "International" },
+            "Politecnico di Bari": { url: "www.poliba.it", logo: null, category: "International" },
+            "Czech Technical University In Prague": { url: "www.fsv.cvut.cz", logo: null, category: "International" },
+            "Czech Technical University In Prague-Faculty of Civil Engineering": { url: "www.fsv.cvut.cz", logo: null, category: "International" },
+            "Institut Jozef Stefan": { url: "www.ijs.si", logo: null, category: "International" },
+            "Seven-The Energy Efficiency Center Z.U.": { url: "www.svn.cz", logo: null, category: "International" },
+            "Université Libre de Bruxelles": { url: "www.ulb.be", logo: null, category: "International" },
+            "Vrije Universiteit Brussel": { url: "www.vub.be", logo: null, category: "International" },
+            "E.On Energiinfrastruktur": { url: "www.eon.se", logo: null, category: "International" },
+            "Kungliga Tekniska Hoegskolan": { url: "www.kth.se", logo: null, category: "International" },
+            "Malmo Fotbollforening": { url: "www.mff.se", logo: null, category: "International" },
+            "Stichting Hogeschool Utrecht": { url: "www.hu.nl", logo: null, category: "International" }
         };
 
-        const projectMetadata = {
-            "OPENhauswirtschaft": { website: "https://projekte.ffg.at/projekt/3226093", logo: "https://diehauswirtschaft.at/wp-content/uploads/2022/04/dieHausWirtschaft-Lockup-cropped-hoch_Logo-dunkelblau-768x371.png" },
-            "lieBeKlima": { website: "https://projekte.ffg.at/projekt/4227276", logo: "https://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2025/12/Bild-300x252.png" },
-            "DieWärmePioniere": { website: "https://projekte.ffg.at/projekt/4425009", logo: "http://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2026/01/Ohne-Titel-8-scaled.png" },
-            "Citizens4PED": { website: "https://citizens4ped.eu/", logo: "http://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2026/01/c4p.png" },
-            "DekarboGen": { website: "https://projekte.ffg.at/projekt/4672920", logo: "https://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2025/05/LOGO_1-300x83.png" },
-            "#EEG++": { website: "https://projekte.ffg.at/projekt/4762052", logo: "http://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2026/01/eeg-scaled.png" },
-            "ZxB": { website: "https://zxb-info.at/", logo: "https://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2025/12/ZxB_Logo_230729-300x238.png" },
-            "HeatCOOP": { website: "https://blog.gemeinschaffen.com/2024/11/25/heatcoop-2/", logo: "https://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2025/05/HeatCoop_Logo-300x61.png" },
-            "ZplusB": { website: "https://projekte.ffg.at/projekt/5135931", logo: "https://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2025/05/ZB_Logo_250113-300x200.png" },
-            "Siedler:innen": { website: "https://projekte.ffg.at/projekt/5140203", logo: "https://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2026/01/dieSiedlerinnen-scaled.png" },
-            "Coop4PEDS": { website: "https://projekte.ffg.at/projekt/5143182", logo: "http://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2025/12/Coop4PEDs_LOGO-scaled.png" },
-            "SchrittZuKlimafit": { website: "https://projekte.ffg.at/projekt/5145349", logo: "http://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2026/01/dieSiedlerinnen-scaled.png" },
-            "PED StepWise": { website: "https://projekte.ffg.at/projekt/4869320", logo: "https://pedstepwise.wp.anton.realitylab.at/wp-content/uploads/sites/46/2024/07/PED-StepWise-Logo-300x50.png" }
+        // Blatt 2: Projekte Metadaten
+        const projectInfo = {
+            "3226093": { title: "OPENhauswirtschaft", abstract: "Innovatives Hauswirtschaften im nutzungsgemischten Stadtkern", period: "2019 - 2022", program: "Stadt der Zukunft", call: "5. Ausschreibung", keywords: "Nutzungsmischung; Erdgeschosszone; kooperative Stadtentwicklung", website: "https://projekte.ffg.at/projekt/3226093", logo: "https://diehauswirtschaft.at/wp-content/uploads/2022/04/dieHausWirtschaft-Lockup-cropped-hoch_Logo-dunkelblau-768x371.png" },
+            "4227276": { title: "lieBeKlima", abstract: "Qualitätssicherung der liegenschafts-übergreifenden Begrünung", period: "2022 - 2022", program: "Stadt der Zukunft", call: "8. Ausschreibung", keywords: "Begrünung; Klimaanpassung", website: "https://projekte.ffg.at/projekt/4227276", logo: "https://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2025/12/Bild-300x252.png" },
+            "4425009": { title: "DieWärmePioniere", abstract: "Partizipativer Klima-Transformationsfahrplan Kahlenbergerdorf", period: "2022 - 2023", program: "Stadt der Zukunft", call: "Themenausschreibung 2021", keywords: "Wärmewende; Bürgerbeteiligung", website: "https://projekte.ffg.at/projekt/4425009", logo: "http://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2026/01/Ohne-Titel-8-scaled.png" },
+            "4459629": { title: "Citizens4PED", abstract: "Citizen-inclusive PEDs in existing urban areas", period: "2022 - 2025", program: "JPI Urban Europe", call: "Positive Energy Districts 2021", keywords: "PED; Positive Energy District", website: "https://citizens4ped.eu/", logo: "http://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2026/01/c4p.png" },
+            "4672920": { title: "DekarboGen", abstract: "Wärmewende-Genossenschaften zur Forcierung der urbanen Dekarbonisierung", period: "2023 - 2026", program: "Stadt der Zukunft", call: "Themenausschreibung 2022", keywords: "Genossenschaften; Wärmewende", website: "https://projekte.ffg.at/projekt/4672920", logo: "https://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2025/05/LOGO_1-300x83.png" },
+            "4762052": { title: "#EEG++", abstract: "Digitale Plus-Energiegemeinschaften Optimiert", period: "2023 - 2025", program: "Energieforschung", call: "Ausschreibung 2022", keywords: "Energiegemeinschaft; Digitalisierung", website: "https://projekte.ffg.at/projekt/4762052", logo: "http://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2026/01/eeg-scaled.png" },
+            "4821201": { title: "ZxB", abstract: "Zinshaus X Baugruppe", period: "2023 - 2026", program: "Stadt der Zukunft", call: "Themenausschreibung 2022", keywords: "Zinshaus; Baugruppe", website: "https://zxb-info.at/", logo: "https://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2025/12/ZxB_Logo_230729-300x238.png" },
+            "4869321": { title: "HeatCOOP", abstract: "Residents Owned Heat Cooperatives", period: "2023 - 2026", program: "ERA-Net SES", call: "Joint Call 2022", keywords: "Heat Cooperatives; Dekarbonisierung", website: "https://blog.gemeinschaffen.com/2024/11/25/heatcoop-2/", logo: "https://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2025/05/HeatCoop_Logo-300x61.png" },
+            "5135931": { title: "ZplusB", abstract: "Baugruppenquartier Graz", period: "2024 - 2025", program: "Stadt der Zukunft", call: "Ausschreibung 2023", keywords: "Baugruppe; Graz", website: "https://projekte.ffg.at/projekt/5135931", logo: "https://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2025/05/ZB_Logo_250113-300x200.png" },
+            "5140203": { title: "Siedler:innen", abstract: "Lokale Wärme Gemeinsam", period: "2025 - 2026", program: "Klima- und Energiefonds", call: "Leuchttürme der Wärmewende 2024", keywords: "Wärmewende; Partizipation", website: "https://projekte.ffg.at/projekt/5140203", logo: "https://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2026/01/dieSiedlerinnen-scaled.png" },
+            "5143182": { title: "Coop4PEDS", abstract: "Cooperatives as drivers of urban energy strategies", period: "2025 - 2028", program: "DUT", call: "Call 2023", keywords: "Genossenschaften; PED", website: "https://projekte.ffg.at/projekt/5143182", logo: "http://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2025/12/Coop4PEDs_LOGO-scaled.png" },
+            "5145349": { title: "SchrittZuKlimafit", abstract: "Nachverdichtung als Chance", period: "2025 - 2026", program: "Klima- und Energiefonds", call: "Leuchttürme der Wärmewende 2024", keywords: "Anergienetz; Nachverdichtung", website: "https://projekte.ffg.at/projekt/5145349", logo: "http://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2026/01/dieSiedlerinnen-scaled.png" },
+            "4869320": { title: "PED StepWise", abstract: "Participatory step-by-step implementation process map", period: "2023 - 2026", program: "DUT", call: "Ausschreibung 2022", keywords: "renewable energy; PED", website: "https://projekte.ffg.at/projekt/4869320", logo: "https://pedstepwise.wp.anton.realitylab.at/wp-content/uploads/sites/46/2024/07/PED-StepWise-Logo-300x50.png" },
+            "4425263": { title: "ZuZugLeben", abstract: "Partizipative Vitalisierung von Arbeitersiedlungen", period: "2022 - 2026", program: "Smart Cities Initiative", call: "Smart Cities 2021", keywords: "Quartiersentwicklung; Partizipation", website: "https://www.klimafonds.gv.at/projekt/zuzugleben/", logo: "https://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2026/01/ZUZUGLEBEN.png" },
+            "5132004": { title: "KlimaQuartierNikolai", abstract: "Klimaneutrales Energiekonzept NikolaiViertel", period: "2024 - 2026", program: "Leuchttürme für resiliente Städte 2040", call: "Ausschreibung 2023", keywords: "Klimaneutralität; Energieversorgung", website: "https://projekte.ffg.at/projekt/5132004", logo: "https://rl.wp.anton.realitylab.at/wp-content/uploads/sites/26/2025/12/KlimaQuartierNikolai-scaled.png" }
         };
 
-        const rawData = [
-            { id: "3226093", title: "OPENhauswirtschaft", org: "Technische Universität Wien", role: "Konsortialführer", abstract: "Innovatives Hauswirtschaften im nutzungsgemischten Stadtkern...", period: "2019 - 2022", keywords: "Nutzungsmischung; Erdgeschosszone; kooperative Stadtentwicklung", program: "Stadt der Zukunft", call: "5. Ausschreibung" },
-            { id: "3226093", title: "OPENhauswirtschaft", org: "Die HausWirtschaft e.Gen.", role: "Konsortialpartner" },
-            { id: "3226093", title: "OPENhauswirtschaft", org: "EGW Erste gemeinnützige Wohnungsgesellschaft mbH", role: "Konsortialpartner" },
-            { id: "3226093", title: "OPENhauswirtschaft", org: "einszueins architektur ZT GMBH", role: "Konsortialpartner" },
-            { id: "3226093", title: "OPENhauswirtschaft", org: "realitylab GmbH", role: "Konsortialpartner" },
-            { id: "4227276", title: "lieBeKlima", org: "STC Development GmbH", role: "Konsortialführer", abstract: "Qualitätssicherung der liegenschafts-übergreifenden Begrünung...", period: "2022 - 2022", keywords: "Begrünung; Klimaanpassung", program: "Stadt der Zukunft", call: "8. Ausschreibung" },
-            { id: "4227276", title: "lieBeKlima", org: "GrünStattGrau Forschungs- und Innovations-GmbH", role: "Konsortialpartner" },
-            { id: "4227276", title: "lieBeKlima", org: "Universität für Bodenkultur Wien", role: "Konsortialpartner" },
-            { id: "4227276", title: "lieBeKlima", org: "e7 GmbH", role: "Konsortialpartner" },
-            { id: "4227276", title: "lieBeKlima", org: "grünplan gmbh", role: "Konsortialpartner" },
-            { id: "4227276", title: "lieBeKlima", org: "realitylab GmbH", role: "Konsortialpartner" },
-            { id: "4425009", title: "DieWärmePioniere", org: "e7 GmbH", role: "Konsortialführer", abstract: "Partizipativer Klima-Transformationsfahrplan Kahlenbergerdorf...", period: "2022 - 2023", keywords: "Wärmewende; Bürgerbeteiligung", program: "Stadt der Zukunft", call: "Themenausschreibung 2021" },
-            { id: "4425009", title: "DieWärmePioniere", org: "Verein zur Förderung der Klimaneutralität im Kahlenbergerdörfl", role: "Konsortialpartner" },
-            { id: "4425009", title: "DieWärmePioniere", org: "realitylab GmbH", role: "Konsortialpartner" },
-            { id: "4459629", title: "Citizens4PED", org: "e7 GmbH", role: "Konsortialführer", abstract: "Citizen-inclusive PEDs in existing urban areas...", period: "2022 - 2025", keywords: "PED; Positive Energy District", program: "JPI Urban Europe", call: "Positive Energy Districts 2021" },
-            { id: "4459629", title: "Citizens4PED", org: "Arteria Technologies FlexCo", role: "Konsortialpartner" },
-            { id: "4459629", title: "Citizens4PED", org: "Fachhochschule Technikum Wien", role: "Konsortialpartner" },
-            { id: "4459629", title: "Citizens4PED", org: "realitylab GmbH", role: "Konsortialpartner" },
-            { id: "4672920", title: "DekarboGen", org: "e7 GmbH", role: "Konsortialführer", abstract: "Wärmewende-Genossenschaften...", period: "2023 - 2026", keywords: "Genossenschaften; Wärmewende", program: "Stadt der Zukunft", call: "Themenausschreibung 2022" },
-            { id: "4672920", title: "DekarboGen", org: "Gartenheim Genossenschaft", role: "Konsortialpartner" },
-            { id: "4672920", title: "DekarboGen", org: "REENAG Holding GmbH", role: "Konsortialpartner" },
-            { id: "4672920", title: "DekarboGen", org: "SOZIALBAU AG", role: "Konsortialpartner" },
-            { id: "4672920", title: "DekarboGen", org: "realitylab GmbH", role: "Konsortialpartner" },
-            { id: "4762052", title: "#EEG++", org: "Arteria Technologies FlexCo", role: "Konsortialführer", abstract: "Digitale Plus-Energiegemeinschaften Optimiert...", period: "2023 - 2025", keywords: "Energiegemeinschaft; Digitalisierung", program: "Energieforschung", call: "Ausschreibung 2022" },
-            { id: "4762052", title: "#EEG++", org: "CEAS GmbH", role: "Konsortialpartner" },
-            { id: "4762052", title: "#EEG++", org: "Pink GmbH", role: "Konsortialpartner" },
-            { id: "4762052", title: "#EEG++", org: "ed-energiedigital GmbH", role: "Konsortialpartner" },
-            { id: "4762052", title: "#EEG++", org: "realitylab GmbH", role: "Konsortialpartner" },
-            { id: "4821201", title: "ZxB", org: "realitylab GmbH", role: "Konsortialführer", abstract: "Zinshaus X Baugruppe...", period: "2023 - 2026", keywords: "Zinshaus; Baugruppe", program: "Stadt der Zukunft", call: "Themenausschreibung 2022" },
-            { id: "4821201", title: "ZxB", org: "Initiative Gemeinsam Bauen und Wohnen", role: "Konsortialpartner" },
-            { id: "4821201", title: "ZxB", org: "e7 GmbH", role: "Konsortialpartner" },
-            { id: "4821201", title: "ZxB", org: "baukult ZT GmbH", role: "Konsortialpartner" },
-            { id: "4869321", title: "HeatCOOP", org: "realitylab GmbH", role: "Konsortialführer", abstract: "Residents Owned Heat Cooperatives...", period: "2023 - 2026", keywords: "Heat Cooperatives; Dekarbonisierung", program: "ERA-Net SES", call: "Joint Call 2022" },
-            { id: "4869321", title: "HeatCOOP", org: "REENAG Holding GmbH", role: "Konsortialpartner" },
-            { id: "4869321", title: "HeatCOOP", org: "e7 GmbH", role: "Konsortialpartner" },
-            { id: "5135931", title: "ZplusB", org: "realitylab GmbH", role: "Konsortialführer", abstract: "Baugruppenquartier Graz...", period: "2024 - 2025", keywords: "Baugruppe; Graz", program: "Stadt der Zukunft", call: "Ausschreibung 2023" },
-            { id: "5135931", title: "ZplusB", org: "M2S Rechtsanwälte GmbH", role: "Konsortialpartner" },
-            { id: "5135931", title: "ZplusB", org: "e7 GmbH", role: "Konsortialpartner" },
-            { id: "5140203", title: "Siedler:innen", org: "realitylab GmbH", role: "Konsortialführer", abstract: "Lokale Wärme Gemeinsam...", period: "2025 - 2026", keywords: "Wärmewende; Partizipation", program: "Klima- und Energiefonds", call: "Leuchttürme der Wärmewende 2024" },
-            { id: "5140203", title: "Siedler:innen", org: "Gartenheim Genossenschaft", role: "Konsortialpartner" },
-            { id: "5140203", title: "Siedler:innen", org: "nonconform zt gmbh", role: "Konsortialpartner" },
-            { id: "5140203", title: "Siedler:innen", org: "e7 GmbH", role: "Konsortialpartner" },
-            { id: "5143182", title: "Coop4PEDS", org: "realitylab GmbH", role: "Konsortialführer", abstract: "Cooperatives as drivers of urban energy strategies...", period: "2025 - 2028", keywords: "Genossenschaften; PED", program: "DUT", call: "Call 2023" },
-            { id: "5143182", title: "Coop4PEDS", org: "Volkshilfe Wien", role: "Konsortialpartner" },
-            { id: "5143182", title: "Coop4PEDS", org: "e7 GmbH", role: "Konsortialpartner" },
-            { id: "5145349", title: "SchrittZuKlimafit", org: "e7 GmbH", role: "Konsortialführer", abstract: "Nachverdichtung als Chance...", period: "2025 - 2026", keywords: "Anergienetz; Nachverdichtung", program: "Klima- und Energiefonds", call: "Leuchttürme der Wärmewende 2024" },
-            { id: "5145349", title: "SchrittZuKlimafit", org: "Gartenheim Genossenschaft", role: "Konsortialpartner" },
-            { id: "5145349", title: "SchrittZuKlimafit", org: "realitylab GmbH", role: "Konsortialpartner" },
-            { id: "4869320", title: "PED StepWise", org: "e7 GmbH", role: "Konsortialführer", abstract: "Participatory step-by-step implementation process map...", period: "2023 - 2026", keywords: "renewable energy; PED", program: "DUT", call: "Ausschreibung 2022" },
-            { id: "4869320", title: "PED StepWise", org: "Arteria Technologies FlexCo", role: "Konsortialpartner" },
-            { id: "4869320", title: "PED StepWise", org: "realitylab GmbH", role: "Konsortialpartner" }
+        // Blatt 3: Verknüpfungen (Links)
+        const edgeList = [
+            { id: "3226093", org: "Technische Universität Wien", role: "Konsortialführer" },
+            { id: "3226093", org: "Die HausWirtschaft e.Gen.", role: "Konsortialpartner" },
+            { id: "3226093", org: "EGW Erste gemeinnützige Wohnungsgesellschaft mbH", role: "Konsortialpartner" },
+            { id: "3226093", org: "einszueins architektur ZT GMBH", role: "Konsortialpartner" },
+            { id: "3226093", org: "realitylab GmbH", role: "Konsortialpartner" },
+            { id: "4227276", org: "STC Development GmbH", role: "Konsortialführer" },
+            { id: "4227276", org: "realitylab GmbH", role: "Konsortialpartner" },
+            { id: "4227276", org: "GrünStattGrau Forschungs- und Innovations-GmbH", role: "Konsortialpartner" },
+            { id: "4227276", org: "Universität für Bodenkultur Wien", role: "Konsortialpartner" },
+            { id: "4227276", org: "e7 GmbH", role: "Konsortialpartner" },
+            { id: "4227276", org: "grünplan gmbh", role: "Konsortialpartner" },
+            { id: "4425009", org: "e7 GmbH", role: "Konsortialführer" },
+            { id: "4425009", org: "realitylab GmbH", role: "Konsortialpartner" },
+            { id: "4425009", org: "Verein zur Förderung der Klimaneutralität im Kahlenbergerdörfl", role: "Konsortialpartner" },
+            { id: "4459629", org: "e7 GmbH", role: "Konsortialführer" },
+            { id: "4459629", org: "Citizens4PED", role: "Konsortialpartner" },
+            { id: "4459629", org: "Arteria Technologies FlexCo", role: "Konsortialpartner" },
+            { id: "4459629", org: "Fachhochschule Technikum Wien", role: "Konsortialpartner" },
+            { id: "4459629", org: "realitylab GmbH", role: "Konsortialpartner" },
+            { id: "4459629", org: "Université Libre de Bruxelles", role: "Konsortialführer" },
+            { id: "4459629", org: "Vrije Universiteit Brussel", role: "Konsortialpartner" },
+            { id: "4459629", org: "Politecnico di Bari", role: "Konsortialpartner" },
+            { id: "4672920", org: "e7 GmbH", role: "Konsortialführer" },
+            { id: "4672920", org: "realitylab GmbH", role: "Konsortialpartner" },
+            { id: "4672920", org: "Gartenheim Genossenschaft", role: "Konsortialpartner" },
+            { id: "4672920", org: "REENAG Holding GmbH", role: "Konsortialpartner" },
+            { id: "4672920", org: "SOZIALBAU AG", role: "Konsortialpartner" },
+            { id: "4762052", org: "Arteria Technologies FlexCo", role: "Konsortialführer" },
+            { id: "4762052", org: "realitylab GmbH", role: "Konsortialpartner" },
+            { id: "4762052", org: "CEAS GmbH", role: "Konsortialpartner" },
+            { id: "4762052", org: "Pink GmbH", role: "Konsortialpartner" },
+            { id: "4762052", org: "ed-energiedigital GmbH", role: "Konsortialpartner" },
+            { id: "4821201", org: "realitylab GmbH", role: "Konsortialführer" },
+            { id: "4821201", org: "Initiative Gemeinsam Bauen und Wohnen", role: "Konsortialpartner" },
+            { id: "4821201", org: "e7 GmbH", role: "Konsortialpartner" },
+            { id: "4821201", org: "baukult ZT GmbH", role: "Konsortialpartner" },
+            { id: "4869321", org: "realitylab GmbH", role: "Konsortialführer" },
+            { id: "4869321", org: "REENAG Holding GmbH", role: "Konsortialpartner" },
+            { id: "4869321", org: "e7 GmbH", role: "Konsortialpartner" },
+            { id: "4869321", org: "Czech Technical University In Prague-Faculty of Civil Engineering", role: "Konsortialpartner" },
+            { id: "4869321", org: "Institut Jozef Stefan", role: "Konsortialpartner" },
+            { id: "4869321", org: "Seven-The Energy Efficiency Center Z.U.", role: "Konsortialpartner" },
+            { id: "5135931", org: "realitylab GmbH", role: "Konsortialführer" },
+            { id: "5135931", org: "M2S Rechtsanwälte GmbH", role: "Konsortialpartner" },
+            { id: "5135931", org: "Z plus B - gemeinschaftliches Wohnen in Graz", role: "Konsortialpartner" },
+            { id: "5135931", org: "e7 GmbH", role: "Konsortialpartner" },
+            { id: "5140203", org: "realitylab GmbH", role: "Konsortialführer" },
+            { id: "5140203", org: "Gartenheim Genossenschaft", role: "Konsortialpartner" },
+            { id: "5140203", org: "nonconform zt gmbh", role: "Konsortialpartner" },
+            { id: "5140203", org: "e7 GmbH", role: "Konsortialpartner" },
+            { id: "5143182", org: "realitylab GmbH", role: "Konsortialführer" },
+            { id: "5143182", org: "Volkshilfe Wien", role: "Konsortialpartner" },
+            { id: "5143182", org: "e7 GmbH", role: "Konsortialpartner" },
+            { id: "5143182", org: "Bostadsrättsföreningen Röda Oasen", role: "Konsortialpartner" },
+            { id: "5143182", org: "Drevet Koncept AB", role: "Konsortialpartner" },
+            { id: "5143182", org: "InnovAction Società Cooperativa", role: "Konsortialpartner" },
+            { id: "5143182", org: "Lunds universitet", role: "Konsortialpartner" },
+            { id: "5143182", org: "Malmö stad", role: "Konsortialpartner" },
+            { id: "5143182", org: "Politecnico di Bari", role: "Konsortialpartner" },
+            { id: "5145349", org: "e7 GmbH", role: "Konsortialführer" },
+            { id: "5145349", org: "realitylab GmbH", role: "Konsortialpartner" },
+            { id: "5145349", org: "Gartenheim Genossenschaft", role: "Konsortialpartner" },
+            { id: "4869320", org: "e7 GmbH", role: "Konsortialführer" },
+            { id: "4869320", org: "realitylab GmbH", role: "Konsortialpartner" },
+            { id: "4869320", org: "Arteria Technologies FlexCo", role: "Konsortialpartner" },
+            { id: "4869320", org: "E.On Energiinfrastruktur", role: "Konsortialpartner" },
+            { id: "4869320", org: "Kungliga Tekniska Hoegskolan", role: "Konsortialpartner" },
+            { id: "4869320", org: "Malmo Fotbollforening", role: "Konsortialpartner" },
+            { id: "4869320", org: "Malmö stad", role: "Konsortialpartner" },
+            { id: "4869320", org: "Stichting Hogeschool Utrecht", role: "Konsortialpartner" },
+            { id: "4425263", org: "ÖBB-Infrastruktur Aktiengesellschaft (ÖBB-Infra)", role: "Konsortialführer" },
+            { id: "4425263", org: "realitylab GmbH", role: "Konsortialpartner" },
+            { id: "4425263", org: "HERRY Consult GmbH", role: "Konsortialpartner" },
+            { id: "4425263", org: "e7 GmbH", role: "Konsortialpartner" },
+            { id: "4425263", org: "grünplan gmbh", role: "Konsortialpartner" },
+            { id: "4425263", org: "Ernst RAINER - Büro für resiliente Raum- und Stadtentwicklung e.U.", role: "Konsortialpartner" },
+            { id: "4425263", org: "S&P Architekten ZT GmbH", role: "Konsortialpartner" },
+            { id: "4425263", org: "Technische Universität Wien", role: "Konsortialpartner" },
+            { id: "5132004", org: "e7 GmbH", role: "Konsortialführer" },
+            { id: "5132004", org: "Landeskrankenanstalten-Betriebsgesellschaft-KABEG", role: "Konsortialpartner" },
+            { id: "5132004", org: "realitylab GmbH", role: "Konsortialpartner" },
+            { id: "5132004", org: "KELAG Energie & Wärme GmbH", role: "Konsortialpartner" },
+            { id: "5132004", org: "VKFG Villacher Klimafit GmbH", role: "Konsortialpartner" },
+            { id: "5132004", org: "Ernst RAINER - Büro für resiliente Raum- und Stadtentwicklung e.U.", role: "Konsortialpartner" }
         ];
+
+        // Synthesize rawData like original structure
+        const rawData = edgeList.map(edge => {
+            const pInfo = projectInfo[edge.id];
+            if (!pInfo) return null; 
+            return {
+                id: edge.id,
+                title: pInfo.title,
+                org: edge.org,
+                role: edge.role,
+                abstract: pInfo.abstract,
+                period: pInfo.period,
+                keywords: pInfo.keywords,
+                program: pInfo.program,
+                call: pInfo.call
+            };
+        }).filter(Boolean);
+
 
         const processData = () => {
             const nodesMap = {};
             const links = [];
+            
             rawData.forEach(row => {
                 const pKey = `proj_${row.title}`;
                 const isRealitylabLead = rawData.some(r => r.title === row.title && r.org === "realitylab GmbH" && r.role === "Konsortialführer");
+                
                 if (!nodesMap[pKey]) {
-                    const pMeta = projectMetadata[row.title] || {};
+                    const pMeta = projectInfo[row.id] || {}; 
                     nodesMap[pKey] = { 
                         id: pKey, name: row.title, type: 'project', 
                         abstract: row.abstract, period: row.period,
@@ -158,18 +314,20 @@
                         url: pMeta.website || null
                     };
                 }
-                let orgName = row.org;
-                if (orgName.includes("Gartenheim")) orgName = "Gartenheim Genossenschaft";
-                if (orgName.includes("SOZIALBAU")) orgName = "SOZIALBAU AG";
+
+                const orgName = row.org;
                 const oKey = `org_${orgName}`;
+                
                 if (!nodesMap[oKey]) {
-                    const meta = orgMetadata[row.org] || orgMetadata[orgName] || {};
+                    const meta = orgDataMap[orgName] || { category: "National" }; 
                     nodesMap[oKey] = { 
-                        id: oKey, name: row.org, type: 'org',
+                        id: oKey, name: orgName, type: 'org',
                         logo: meta.logo || null,
-                        url: meta.url || null
+                        url: meta.url || null,
+                        category: meta.category
                     };
                 }
+                
                 links.push({ source: oKey, target: pKey, role: row.role });
             });
             return { nodes: Object.values(nodesMap), links };
@@ -191,9 +349,7 @@
             const svgRef = useRef(null);
             const requestRef = useRef();
 
-            useEffect(() => {
-                if (window.lucide) window.lucide.createIcons();
-            }, [selectedNode, isLegendExpanded]);
+            // Removed conflicting useEffect for global createIcons
 
             const updatePhysics = useCallback(() => {
                 setNodes(prev => {
@@ -202,34 +358,55 @@
                     const height = svgRef.current?.clientHeight || 800;
                     const centerY = isLegendExpanded ? height / 2 : height * 0.45;
 
+                    // 1. Repulsion
                     for (let i = 0; i < next.length; i++) {
                         for (let j = i + 1; j < next.length; j++) {
                             const a = next[i], b = next[j];
                             let dx = a.x - b.x, dy = a.y - b.y;
                             let d2 = dx * dx + dy * dy || 1;
-                            let force = 4000 / d2;
-                            if (a.id !== dragNodeId) { a.vx += (dx / Math.sqrt(d2)) * force; a.vy += (dy / Math.sqrt(d2)) * force; }
-                            if (b.id !== dragNodeId) { b.vx -= (dx / Math.sqrt(d2)) * force; b.vy -= (dy / Math.sqrt(d2)) * force; }
+                            let dist = Math.sqrt(d2);
+
+                            const rA = a.category === 'Realitylab' ? 120 : (a.type === 'project' ? 70 : 50);
+                            const rB = b.category === 'Realitylab' ? 120 : (b.type === 'project' ? 70 : 50);
+                            const minDist = rA + rB;
+
+                            let force = 0;
+                            if (dist < minDist) {
+                                force = (minDist - dist) * 0.2; 
+                            } else {
+                                force = 8000 / d2; 
+                            }
+
+                            if (a.id !== dragNodeId) { a.vx += (dx / dist) * force; a.vy += (dy / dist) * force; }
+                            if (b.id !== dragNodeId) { b.vx -= (dx / dist) * force; b.vy -= (dy / dist) * force; }
                         }
                     }
 
+                    // 2. Links
                     processedLinks.forEach(l => {
                         const s = next.find(n => n.id === l.source), t = next.find(n => n.id === l.target);
                         if (s && t) {
                             let dx = t.x - s.x, dy = t.y - s.y;
                             let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                            let force = (dist - 150) * 0.04;
+                            
+                            const isHubConnection = s.category === 'Realitylab' || t.category === 'Realitylab';
+                            const targetDist = isHubConnection ? 220 : 110; 
+
+                            let force = (dist - targetDist) * 0.03; 
+                            
                             if (s.id !== dragNodeId) { s.vx += (dx / dist) * force; s.vy += (dy / dist) * force; }
                             if (t.id !== dragNodeId) { t.vx -= (dx / dist) * force; t.vy -= (dy / dist) * force; }
                         }
                     });
 
+                    // 3. Centering
                     next.forEach(n => {
                         if (n.id === dragNodeId) return;
                         n.vx += (width / 2 - n.x) * 0.005;
                         n.vy += (centerY - n.y) * 0.005;
+                        
                         n.x += n.vx; n.y += n.vy;
-                        n.vx *= 0.6; n.vy *= 0.6;
+                        n.vx *= 0.55; n.vy *= 0.55; 
                     });
                     return next;
                 });
@@ -241,154 +418,201 @@
                 return () => cancelAnimationFrame(requestRef.current);
             }, [updatePhysics]);
 
-            return (
-                <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans text-slate-900">
-                    <header className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-lg z-20 shrink-0">
-                        <div className="flex items-center gap-3 font-bold">
-                            <Icon name="layers" className="text-emerald-400" />
-                            <span className="tracking-tight uppercase text-lg">realitylab - Forschungsnetzwerk</span>
-                        </div>
-                    </header>
+            const getNodeColor = (n) => {
+                if (n.type === 'project') return n.isLead ? "#064e3b" : "#dcfce7";
+                if (n.category === "Realitylab") return "#dc2626";
+                if (n.category === "International") return "#f3e8ff"; 
+                return "#eff6ff"; 
+            };
 
-                    <div className="flex-1 relative flex overflow-hidden">
-                        <div className="absolute top-4 left-4 z-10 max-w-sm">
-                            <div className="bg-white/95 backdrop-blur shadow-xl border border-slate-200 rounded-2xl overflow-hidden transition-all duration-300">
-                                <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 border-b border-transparent" onClick={() => setIsLegendExpanded(!isLegendExpanded)}>
-                                    <div className="flex items-center gap-2">
-                                        <Icon name="info" className="text-indigo-600" />
-                                        <span className="font-bold text-sm text-slate-900">Informationen</span>
+            const getStrokeColor = (n) => {
+                 if (n.type === 'project') return n.isLead ? "#059669" : "#10b981";
+                 if (n.category === "Realitylab") return "#dc2626";
+                 if (n.category === "International") return "#7e22ce";
+                 return "#3b82f6";
+            };
+            
+            // Stable sort using useMemo to prevent re-sorting on every render
+            const sortedNodes = useMemo(() => {
+                return [...nodes].sort((a, b) => {
+                    if (a.category === 'Realitylab') return 1;
+                    if (b.category === 'Realitylab') return -1;
+                    return 0;
+                });
+            }, [nodes]);
+
+            return (
+                <ErrorBoundary>
+                    <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans text-slate-900">
+                        <header className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-lg z-20 shrink-0">
+                            <div className="flex items-center gap-3 font-bold">
+                                <Icon name="layers" className="text-emerald-400" />
+                                <span className="tracking-tight uppercase text-lg">realitylab - Forschungsnetzwerk</span>
+                            </div>
+                        </header>
+
+                        <div className="flex-1 relative flex overflow-hidden">
+                            <div className="absolute top-4 left-4 z-10 max-w-sm">
+                                <div className="bg-white/95 backdrop-blur shadow-xl border border-slate-200 rounded-2xl overflow-hidden transition-all duration-300">
+                                    <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 border-b border-transparent" onClick={() => setIsLegendExpanded(!isLegendExpanded)}>
+                                        <div className="flex items-center gap-2">
+                                            <Icon name="info" className="text-indigo-600" />
+                                            <span className="font-bold text-sm text-slate-900">Informationen</span>
+                                        </div>
+                                        {isLegendExpanded ? <Icon name="chevron-up" /> : <Icon name="chevron-down" />}
                                     </div>
-                                    {isLegendExpanded ? <Icon name="chevron-up" /> : <Icon name="chevron-down" />}
-                                </div>
-                                <div className={`transition-all duration-300 overflow-hidden ${isLegendExpanded ? 'max-h-[500px] opacity-100 p-5 pt-0' : 'max-h-0 opacity-0'}`}>
-                                    <div className="text-xs leading-relaxed text-slate-600">
-                                        <p className="font-bold text-slate-900 mb-2 underline decoration-indigo-200">Worum geht es hier?</p>
-                                        Dieses interaktive Netzwerkdiagramm zeigt alle Forschungsprojekte der letzten 5 Jahre, an denen realitylab beteiligt war.
-                                        <div className="mt-3 flex flex-col gap-2">
-                                            <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-100 border border-blue-500"></span><span>Partner sind Kreise</span></div>
-                                            <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-emerald-100 border border-emerald-500"></span><span>Projekte sind Quadrate</span></div>
-                                            <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-emerald-900 border-2 border-emerald-600"></span><span>Wir als Konsortialführer</span></div>
+                                    <div className={`transition-all duration-300 overflow-hidden ${isLegendExpanded ? 'max-h-[500px] opacity-100 p-5 pt-0' : 'max-h-0 opacity-0'}`}>
+                                        <div className="text-xs leading-relaxed text-slate-600">
+                                            <p className="font-bold text-slate-900 mb-2 underline decoration-indigo-200">Worum geht es hier?</p>
+                                            Dieses interaktive Netzwerkdiagramm zeigt alle Forschungsprojekte der letzten Jahre, an denen realitylab beteiligt war.
+                                            <div className="mt-3 flex flex-col gap-2">
+                                                <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-100 border border-blue-500"></span><span>Nationale Partner</span></div>
+                                                <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-purple-100 border border-purple-600"></span><span>Internationale Partner</span></div>
+                                                <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-emerald-100 border border-emerald-500"></span><span>Projekte sind Quadrate</span></div>
+                                                <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-emerald-900 border-2 border-emerald-600"></span><span>Wir als Konsortialführer</span></div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <main className="flex-1 bg-white relative">
-                            <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing" 
-                                 onMouseMove={e => {
-                                     if (dragNodeId) {
-                                         const rect = svgRef.current.getBoundingClientRect();
-                                         setNodes(prev => prev.map(n => n.id === dragNodeId ? { ...n, x: e.clientX - rect.left, y: e.clientY - rect.top, vx: 0, vy: 0 } : n));
-                                     }
-                                 }}
-                                 onMouseUp={() => setDragNodeId(null)}
-                                 onMouseLeave={() => setDragNodeId(null)}>
-                                <defs>
-                                    {nodes.map(n => {
-                                        if (!n.logo) return null;
+                            <main className="flex-1 bg-white relative">
+                                <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing" 
+                                     onMouseMove={e => {
+                                         if (dragNodeId) {
+                                             const rect = svgRef.current.getBoundingClientRect();
+                                             setNodes(prev => prev.map(n => n.id === dragNodeId ? { ...n, x: e.clientX - rect.left, y: e.clientY - rect.top, vx: 0, vy: 0 } : n));
+                                         }
+                                     }}
+                                     onMouseUp={() => setDragNodeId(null)}
+                                     onMouseLeave={() => setDragNodeId(null)}
+                                     onTouchMove={e => {
+                                         if (dragNodeId) {
+                                             const touch = e.touches[0];
+                                             const rect = svgRef.current.getBoundingClientRect();
+                                             setNodes(prev => prev.map(n => n.id === dragNodeId ? { ...n, x: touch.clientX - rect.left, y: touch.clientY - rect.top, vx: 0, vy: 0 } : n));
+                                         }
+                                     }}
+                                     onTouchEnd={() => setDragNodeId(null)}
+                                     >
+                                    <defs>
+                                        {nodes.map(n => {
+                                            if (!n.logo) return null;
+                                            const safeId = n.id.replace(/[^a-zA-Z0-9]/g, '');
+                                            const isRL = n.category === "Realitylab";
+                                            const size = isRL ? 90 : 60; 
+                                            const imgSize = isRL ? 80 : 50;
+                                            const offset = isRL ? 5 : 5;
+                                            
+                                            return (
+                                                <pattern key={`pattern-${n.id}`} id={`logo-${safeId}`} patternUnits="objectBoundingBox" width="1" height="1">
+                                                    <rect width={size} height={size} fill="white" />
+                                                    <image href={n.logo} x={offset} y={offset} width={imgSize} height={imgSize} preserveAspectRatio="xMidYMid meet" />
+                                                </pattern>
+                                            );
+                                        })}
+                                    </defs>
+                                    {processedLinks.map((l, i) => {
+                                        const s = nodes.find(n => n.id === l.source), t = nodes.find(n => n.id === l.target);
+                                        if (!s || !t) return null;
+                                        return <line key={i} x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke={l.role === "Konsortialführer" ? "#6366f1" : "#cbd5e1"} strokeWidth={l.role === "Konsortialführer" ? 2.5 : 1} className="transition-all duration-300 opacity-40" />;
+                                    })}
+                                    {sortedNodes.map(n => {
                                         const safeId = n.id.replace(/[^a-zA-Z0-9]/g, '');
+                                        const initials = n.name.split(/[\s-]+/).map(w => w[0]).join('').substring(0,2).toUpperCase();
+                                        const isRL = n.category === "Realitylab";
+                                        const circleRadius = isRL ? 45 : 30; // Bigger for RL
+                                        const textSize = isRL ? "text-sm" : "text-[10px]";
+                                        
                                         return (
-                                            <pattern key={`pattern-${n.id}`} id={`logo-${safeId}`} patternUnits="objectBoundingBox" width="1" height="1">
-                                                <rect width="60" height="60" fill="white" />
-                                                <image href={n.logo} x="5" y="5" width="50" height="50" preserveAspectRatio="xMidYMid meet" />
-                                            </pattern>
+                                            <g key={n.id} transform={`translate(${n.x},${n.y})`} 
+                                               onMouseDown={(e) => { e.stopPropagation(); setDragNodeId(n.id); setSelectedNode(n); }}
+                                               onTouchStart={(e) => { e.stopPropagation(); setDragNodeId(n.id); setSelectedNode(n); }}
+                                               className="cursor-pointer group">
+                                                {n.type === 'project' ? (
+                                                    <rect x="-30" y="-30" width="60" height="60" rx="12" fill={n.logo ? `url(#logo-${safeId})` : getNodeColor(n)} stroke={getStrokeColor(n)} strokeWidth={n.isLead ? "4" : "2.5"} className="shadow-md hover:scale-110 transition-transform duration-200" />
+                                                ) : (
+                                                    <g className="hover:scale-110 transition-transform duration-200">
+                                                        <circle r={circleRadius} fill={n.logo ? `url(#logo-${safeId})` : getNodeColor(n)} stroke={getStrokeColor(n)} strokeWidth={isRL ? "4" : "2.5"} className="shadow-md" />
+                                                        {!n.logo && <text textAnchor="middle" dy="5" className={`${isRL ? 'fill-white' : (n.category === 'International' ? 'fill-purple-700' : 'fill-blue-600')} font-black text-xs select-none pointer-events-none`}>{isRL ? "RL" : initials}</text>}
+                                                    </g>
+                                                )}
+                                                <text dy={isRL ? "65" : "45"} textAnchor="middle" className={`${textSize} font-bold fill-slate-600 select-none pointer-events-none drop-shadow-sm`}>{n.name.length > 20 ? n.name.substring(0, 18) + ".." : n.name}</text>
+                                            </g>
                                         );
                                     })}
-                                </defs>
-                                {processedLinks.map((l, i) => {
-                                    const s = nodes.find(n => n.id === l.source), t = nodes.find(n => n.id === l.target);
-                                    if (!s || !t) return null;
-                                    return <line key={i} x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke={l.role === "Konsortialführer" ? "#6366f1" : "#cbd5e1"} strokeWidth={l.role === "Konsortialführer" ? 2.5 : 1} className="transition-all duration-300 opacity-40" />;
-                                })}
-                                {nodes.map(n => {
-                                    const isRL = n.name.toLowerCase().includes("realitylab");
-                                    const safeId = n.id.replace(/[^a-zA-Z0-9]/g, '');
-                                    const initials = n.name.split(/[\s-]+/).map(w => w[0]).join('').substring(0,2).toUpperCase();
-                                    return (
-                                        <g key={n.id} transform={`translate(${n.x},${n.y})`} onMouseDown={(e) => { e.stopPropagation(); setDragNodeId(n.id); setSelectedNode(n); }} className="cursor-pointer group">
-                                            {n.type === 'project' ? (
-                                                <rect x="-30" y="-30" width="60" height="60" rx="12" fill={n.logo ? `url(#logo-${safeId})` : (n.isLead ? "#064e3b" : "#dcfce7")} stroke={n.isLead ? "#059669" : "#10b981"} strokeWidth={n.isLead ? "4" : "2.5"} className="shadow-md hover:scale-110 transition-transform duration-200" />
-                                            ) : (
-                                                <g className="hover:scale-110 transition-transform duration-200">
-                                                    <circle r="30" fill={n.logo ? `url(#logo-${safeId})` : (isRL ? "#dc2626" : "#eff6ff")} stroke={isRL ? "#dc2626" : "#3b82f6"} strokeWidth={isRL ? "3" : "2.5"} className="shadow-md" />
-                                                    {!n.logo && <text textAnchor="middle" dy="5" className={`${isRL ? 'fill-white' : 'fill-blue-600'} font-black text-xs select-none pointer-events-none`}>{isRL ? "RL" : initials}</text>}
-                                                </g>
-                                            )}
-                                            <text dy="45" textAnchor="middle" className="text-[10px] font-bold fill-slate-600 select-none pointer-events-none drop-shadow-sm">{n.name.length > 20 ? n.name.substring(0, 18) + ".." : n.name}</text>
-                                        </g>
-                                    );
-                                })}
-                            </svg>
-                        </main>
+                                </svg>
+                            </main>
 
-                        {selectedNode && (
-                            <aside className="w-80 md:w-[450px] bg-white border-l shadow-2xl z-30 flex flex-col h-full overflow-hidden">
-                                <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                                    <button onClick={() => setSelectedNode(null)} className="float-right p-2 hover:bg-slate-100 rounded-full"><Icon name="x" size={20}/></button>
-                                    <div className="flex flex-col gap-6 mb-8 pt-4">
-                                        {selectedNode.logo ? (
-                                            <div className="w-full flex justify-center bg-slate-50 p-6 rounded-2xl border border-dashed border-slate-200"><img src={selectedNode.logo} alt={selectedNode.name} className="max-h-32 object-contain" /></div>
-                                        ) : (
-                                            <div className={`w-20 h-20 rounded-2xl flex items-center justify-center shadow-sm ${selectedNode.type === 'project' ? (selectedNode.isLead ? 'bg-emerald-900 text-emerald-100' : 'bg-emerald-100 text-emerald-700') : (selectedNode.name.toLowerCase().includes("realitylab") ? 'bg-red-600 text-white' : 'bg-blue-600 text-white')}`}>
-                                                {selectedNode.type === 'project' ? <Icon name="briefcase" size={32}/> : <Icon name="building-2" size={32}/>}
-                                            </div>
-                                        )}
-                                        <div>
-                                            <h2 className="text-2xl font-black leading-tight text-slate-900">{selectedNode.name}</h2>
-                                            <div className="flex items-center gap-2 mt-2">
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${selectedNode.type === 'project' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{selectedNode.type === 'project' ? 'Forschungsprojekt' : 'Organisation'}</span>
-                                                {selectedNode.url && <a href={selectedNode.url.startsWith('http') ? selectedNode.url : `https://${selectedNode.url}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-indigo-600 text-[10px] font-bold hover:underline bg-indigo-50 px-2 py-0.5 rounded uppercase"><Icon name="globe" size={10}/> Website</a>}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {selectedNode.type === 'project' ? (
-                                        <div className="space-y-6">
-                                            <div className="grid grid-cols-1 gap-3">
-                                                <div className="flex items-center gap-3 text-xs font-bold text-slate-500 bg-slate-50 p-4 rounded-xl border border-slate-100"><Icon name="calendar" size={16}/> Laufzeit: <span className="text-slate-900 ml-auto">{selectedNode.period}</span></div>
-                                                <div className="flex flex-col gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500"><Icon name="file-text" size={16}/> Programm: <span className="text-slate-900 ml-auto">{selectedNode.program}</span></div>
-                                                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500"><Icon name="award" size={16}/> Ausschreibung: <span className="text-slate-900 ml-auto">{selectedNode.call}</span></div>
+                            {selectedNode && (
+                                <aside className="w-80 md:w-[450px] bg-white border-l shadow-2xl z-30 flex flex-col h-full overflow-hidden absolute right-0 top-0 bottom-0 md:relative">
+                                    <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                                        <button onClick={() => setSelectedNode(null)} className="float-right p-2 hover:bg-slate-100 rounded-full"><Icon name="x" size={20}/></button>
+                                        <div className="flex flex-col gap-6 mb-8 pt-4">
+                                            {selectedNode.logo ? (
+                                                <div className="w-full flex justify-center bg-slate-50 p-6 rounded-2xl border border-dashed border-slate-200"><img src={selectedNode.logo} alt={selectedNode.name} className="max-h-32 object-contain" /></div>
+                                            ) : (
+                                                <div className={`w-20 h-20 rounded-2xl flex items-center justify-center shadow-sm ${selectedNode.type === 'project' ? (selectedNode.isLead ? 'bg-emerald-900 text-emerald-100' : 'bg-emerald-100 text-emerald-700') : (selectedNode.category === 'Realitylab' ? 'bg-red-600 text-white' : (selectedNode.category === 'International' ? 'bg-purple-600 text-white' : 'bg-blue-600 text-white'))}`}>
+                                                    {selectedNode.type === 'project' ? <Icon name="briefcase" size={32}/> : <Icon name="building-2" size={32}/>}
+                                                </div>
+                                            )}
+                                            <div>
+                                                <h2 className="text-2xl font-black leading-tight text-slate-900">{selectedNode.name}</h2>
+                                                <div className="flex items-center gap-2 mt-2">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${selectedNode.type === 'project' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{selectedNode.type === 'project' ? 'Forschungsprojekt' : 'Organisation'}</span>
+                                                    {selectedNode.type !== 'project' && <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-600">{selectedNode.category}</span>}
+                                                    {selectedNode.url && <a href={selectedNode.url.startsWith('http') ? selectedNode.url : `https://${selectedNode.url}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-indigo-600 text-[10px] font-bold hover:underline bg-indigo-50 px-2 py-0.5 rounded uppercase"><Icon name="globe" size={10}/> Website</a>}
                                                 </div>
                                             </div>
-                                            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 italic text-slate-600 text-sm leading-relaxed">{selectedNode.abstract || "Keine Projektbeschreibung vorhanden."}</div>
-                                            <div>
-                                                <h4 className="text-[10px] uppercase font-black tracking-widest text-slate-400 mb-4 border-b pb-2 flex justify-between">Projektkonsortium</h4>
-                                                <div className="space-y-2">
-                                                    {processedLinks.filter(l => l.target === selectedNode.id).map((l, i) => {
-                                                        const orgNode = processedNodes.find(n => n.id === l.source);
+                                        </div>
+                                        {selectedNode.type === 'project' ? (
+                                            <div className="space-y-6">
+                                                <div className="grid grid-cols-1 gap-3">
+                                                    <div className="flex items-center gap-3 text-xs font-bold text-slate-500 bg-slate-50 p-4 rounded-xl border border-slate-100"><Icon name="calendar" size={16}/> Laufzeit: <span className="text-slate-900 ml-auto">{selectedNode.period}</span></div>
+                                                    <div className="flex flex-col gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                                        <div className="flex items-center gap-2 text-xs font-bold text-slate-500"><Icon name="file-text" size={16}/> Programm: <span className="text-slate-900 ml-auto">{selectedNode.program}</span></div>
+                                                        <div className="flex items-center gap-2 text-xs font-bold text-slate-500"><Icon name="award" size={16}/> Ausschreibung: <span className="text-slate-900 ml-auto">{selectedNode.call}</span></div>
+                                                    </div>
+                                                </div>
+                                                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 italic text-slate-600 text-sm leading-relaxed">{selectedNode.abstract || "Keine Projektbeschreibung vorhanden."}</div>
+                                                <div>
+                                                    <h4 className="text-[10px] uppercase font-black tracking-widest text-slate-400 mb-4 border-b pb-2 flex justify-between">Projektkonsortium</h4>
+                                                    <div className="space-y-2">
+                                                        {processedLinks.filter(l => l.target === selectedNode.id).map((l, i) => {
+                                                            const orgNode = processedNodes.find(n => n.id === l.source);
+                                                            return (
+                                                                <div key={i} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-xl hover:shadow-md transition-shadow">
+                                                                    <div className="flex items-center gap-3">{orgNode?.logo ? <img src={orgNode.logo} className="w-8 h-8 object-contain" alt="" /> : <Icon name="building-2" size={16}/>} <span className="text-xs font-bold text-slate-700">{orgNode?.name}</span></div>
+                                                                    <span className={`text-[8px] px-2 py-1 rounded font-black uppercase ${l.role === "Konsortialführer" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-400"}`}>{l.role === "Konsortialführer" ? "Lead" : "Partner"}</span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-6">
+                                                <h4 className="text-[10px] uppercase font-black tracking-widest text-slate-400 mb-4 border-b pb-2">Projektbeteiligungen</h4>
+                                                <div className="space-y-3">
+                                                    {processedLinks.filter(l => l.source === selectedNode.id).map((l, i) => {
+                                                        const proj = processedNodes.find(pn => pn.id === l.target);
+                                                        if (!proj) return null;
                                                         return (
-                                                            <div key={i} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-xl hover:shadow-md transition-shadow">
-                                                                <div className="flex items-center gap-3">{orgNode?.logo ? <img src={orgNode.logo} className="w-8 h-8 object-contain" alt="" /> : <Icon name="building-2" size={16}/>} <span className="text-xs font-bold text-slate-700">{orgNode?.name}</span></div>
-                                                                <span className={`text-[8px] px-2 py-1 rounded font-black uppercase ${l.role === "Konsortialführer" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-400"}`}>{l.role === "Konsortialführer" ? "Lead" : "Partner"}</span>
+                                                            <div key={i} className={`p-4 rounded-2xl border flex items-center gap-4 ${proj.isLead ? 'bg-indigo-900 text-white' : 'bg-slate-50 text-slate-900'}`}>
+                                                                {proj.logo && <img src={proj.logo} className="w-12 h-12 rounded bg-white p-1 object-contain" alt=""/>}
+                                                                <div className="flex-1"><div className="text-sm font-black mb-1">{proj.name}</div><div className="flex items-center gap-3 text-[9px] uppercase font-bold opacity-70"><span>{proj.program}</span><span className="h-1 w-1 bg-current rounded-full"></span><span>{l.role === "Konsortialführer" ? "Lead" : "Partner"}</span></div></div>
                                                             </div>
                                                         );
                                                     })}
                                                 </div>
                                             </div>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-6">
-                                            <h4 className="text-[10px] uppercase font-black tracking-widest text-slate-400 mb-4 border-b pb-2">Projektbeteiligungen</h4>
-                                            <div className="space-y-3">
-                                                {processedLinks.filter(l => l.source === selectedNode.id).map((l, i) => {
-                                                    const proj = processedNodes.find(pn => pn.id === l.target);
-                                                    if (!proj) return null;
-                                                    return (
-                                                        <div key={i} className={`p-4 rounded-2xl border flex items-center gap-4 ${proj.isLead ? 'bg-indigo-900 text-white' : 'bg-slate-50 text-slate-900'}`}>
-                                                            {proj.logo && <img src={proj.logo} className="w-12 h-12 rounded bg-white p-1 object-contain" alt=""/>}
-                                                            <div className="flex-1"><div className="text-sm font-black mb-1">{proj.name}</div><div className="flex items-center gap-3 text-[9px] uppercase font-bold opacity-70"><span>{proj.program}</span><span className="h-1 w-1 bg-current rounded-full"></span><span>{l.role === "Konsortialführer" ? "Lead" : "Partner"}</span></div></div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </aside>
-                        )}
+                                        )}
+                                    </div>
+                                </aside>
+                            )}
+                        </div>
                     </div>
-                </div>
+                </ErrorBoundary>
             );
         }
 
